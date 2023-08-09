@@ -7,8 +7,8 @@
 #include <fstream>
 #include <filesystem>
 #include <torch/torch.h>
-#include "../libs/libBigWig/include/bigWig.h"
-#include "../include/bigWigs2tensors/proc_bigWigs.h"
+#include <bigWigs2tensors/proc_bigWigs.h>
+#include <bigWig.h>
 
 std::vector<bigWigFile_t*> open_bigWigs(const std::vector<std::string>& bw_paths) {
     std::vector<bigWigFile_t*> bw_files;
@@ -68,7 +68,7 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
     return chrom_tensor;
 }
 
-void BWBinner::load_bin_all_chroms(unsigned bin_size) {
+std::map<std::string, torch::Tensor> BWBinner::load_bin_all_chroms(unsigned bin_size) {
     // parallelize over chromosomes
     std::for_each(std::execution::par_unseq,
         chrom_sizes.begin(), chrom_sizes.end(),
@@ -77,6 +77,7 @@ void BWBinner::load_bin_all_chroms(unsigned bin_size) {
             chrom_binneds[chr_entry.first] = BWBinner::load_bin_chrom_tensor(chr_entry.first, bin_size);
         }
     );
+    return chrom_binneds;
 }
 
 std::map<std::string, torch::Tensor> BWBinner::binned_chroms() const {
@@ -89,18 +90,22 @@ void BWBinner::save_binneds(const std::string& out_dir) const {
         std::cout << "Creating directory " << out_dir_p << "\n";
         std::filesystem::create_directory(out_dir_p);
     }
-    
-    std::filesystem::path chrom_names_path{out_dir_p / "chrom_names.txt"};
-    std::ofstream chrom_names_file(chrom_names_path);
+
     for (const auto& [chrom, size] : chrom_sizes) {
-        // add this chrom name to file
-        chrom_names_file << chrom << "\n";
         // save this chrom's binned tensor
         auto bytes = torch::pickle_save(chrom_binneds.at(chrom));
         std::ofstream chr_stream{out_dir_p / (chrom + ".pt")};
         chr_stream.write(bytes.data(), bytes.size());
         chr_stream.close();
     }
-    chrom_names_file.close();
-    // torch::save(chrom_binneds_vec, out_dir_p/"binned_tracks_all_chroms.pt");
+    
+    // save the indices of the bigWigs in the tensor
+    std::filesystem::path bw_idx_p{out_dir_p / "tensor_bigWigs_inds.csv"};
+    std::ofstream bw_idx_F(bw_idx_p);
+    // headers
+    bw_idx_F << "column" << ',' << "name" << '\n';
+    for (size_t i = 0; i < bw_paths.size(); i++) {
+        bw_idx_F << i << ',' << bw_paths[i].stem().string() << '\n';
+    }
+    bw_idx_F.close();
 }
