@@ -20,17 +20,40 @@ int main(int argc, char** argv) {
     try {
         TCLAP::CmdLine cmd("bigWigs binner that converts bigWigs to (pickled) PyTorch tensor files",
                         ' ', "0.1");
-        TCLAP::ValueArg<unsigned> res("r", "resolution", "resolution (bin size) in base pairs", false, 100, "unsigned int");
+        TCLAP::ValueArg<unsigned> res("r", "resolution", "resolution (bin size) in base pairs", false, 100, "unsigned (>= 0) int");
         // TCLAP::UnlabeledMultiArg<std::string> tracks("tracks", "bigWig files to bin", true, "name: str path: str");
-        TCLAP::ValueArg<std::string> tracks_dir("T", "tracks-dir", "directory containing all bigWig files to bin", true, "", "string");
-        TCLAP::ValueArg<std::string> chrom_sizes("s", "chrom-sizes", "chromosome sizes file", true, "", "path: str");
-        TCLAP::UnlabeledValueArg<std::string> out_dir("out-dir", "directory to write binned tensors to", true, "", "string");
+        TCLAP::ValueArg<std::string> tracks_dir("T", "tracks-dir", "directory containing all bigWig files to bin", true, "", "path (string)");
+        TCLAP::ValueArg<std::string> chrom_sizes("s", "chrom-sizes", "chromosome sizes file", true, "", "path (string)");
+        TCLAP::UnlabeledValueArg<std::string> out_dir("out-dir", "directory to write binned tensors to", true, "", "path (string)");
+        TCLAP::SwitchArg verbose("v", "verbose", "print verbose output", false);
         cmd.add(tracks_dir);
         cmd.add(chrom_sizes);
+        cmd.add(res);
+        cmd.add(out_dir);
+        cmd.add(verbose);
         cmd.parse(argc, argv);
 
+        if (verbose.getValue()) {
+            std::cout << "resolution: " << res.getValue() << std::endl;
+            std::cout << "tracks dir: " << tracks_dir.getValue() << std::endl;
+            std::cout << "chrom sizes: " << chrom_sizes.getValue() << std::endl;
+            std::cout << "out dir: " << out_dir.getValue() << std::endl;
+
+            std::cout << "Note: assuming all bigWig files' extension is '.bigWig'" << std::endl;
+        }
+
         // For now, we'll just assume that the user has given us a directory
-        std::vector<std::string> bw_paths = find_paths_filetype(tracks_dir.getValue(), ".bw");
+        std::vector<std::string> bw_paths = find_paths_filetype(tracks_dir.getValue(), ".bigWig");
+        if (bw_paths.size() == 0) {
+            std::cerr << "No bigWig files found in " << tracks_dir.getValue() << std::endl;
+            return 1;
+        }
+        if (verbose.getValue()) {
+            std::cout << "Found " << bw_paths.size() << " bigWig files in " << tracks_dir.getValue() <<":\n";
+            for (auto& path : bw_paths) {
+                std::cout << '\t' << path << std::endl;
+            }
+        }
 
         // std::vector<std::string> bw_names;
         // for (auto& track : tracks.getValue()) {

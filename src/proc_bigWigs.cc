@@ -36,7 +36,7 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
     std::cout << "Binning " << chrom << " into " << num_bins << " bins" << std::endl;
 
     torch::Tensor chrom_tensor = torch::empty({num_bws, num_bins}, tens_opts);
-    std::cout << "Created " << chrom_tensor.sizes() << " Tensor `chrom_tensor`. To fill..." << std::endl;
+    std::cout << "Created " << chrom_tensor.sizes() << " Tensor `chrom_tensor` for "<< num_bws <<" tracks." << std::endl;
     
     // parallelize across bigWigs' indices within the bw_files vector
     // credit: https://stackoverflow.com/a/62829166
@@ -49,13 +49,13 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
                                                     0, chrom_sizes[chrom], num_bins,
                                                     bwStatsType::mean);
 
-                        std::cout << "Inserting Tensor\n";
-                        std::cout << "  heap array from libBigWig: [";
-                        for (int i = 0; i < num_bins; i++)
-                            std::cout << ' ' << binned_vals[i];
-                        std::cout << " ]" << std::endl;
+                        //std::cout << "Inserting Tensor\n";
+                        //std::cout << "  heap array from libBigWig: [";
+                        //for (int i = 0; i < num_bins; i++)
+                        //    std::cout << ' ' << binned_vals[i];
+                        //std::cout << " ]" << std::endl;
 
-                        std::cout << "  into Tensor:\n";
+                        //std::cout << "  into Tensor:\n";
                         std::cout << torch::from_blob(binned_vals, {num_bins}, torch::dtype(torch::kFloat64)) << std::endl;
 
                         using namespace torch::indexing;
