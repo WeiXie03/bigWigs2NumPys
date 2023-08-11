@@ -35,8 +35,8 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
     unsigned num_bins = 1 + ((chrom_sizes[chrom] - 1) / bin_size);
     std::cout << "Binning " << chrom << " into " << num_bins << " bins" << std::endl;
 
-    torch::Tensor chrom_tensor = torch::empty({num_bws, num_bins}, tens_opts);
-    std::cout << "Created " << chrom_tensor.sizes() << " Tensor `chrom_tensor` for "<< num_bws <<" tracks." << std::endl;
+    torch::Tensor chrom_tensor = torch::empty({num_bins, num_bws}, tens_opts);
+    std::cout << "Created " << chrom_tensor.sizes() << " tensor for "<< num_bws <<" tracks." << std::endl;
     
     // parallelize across bigWigs' indices within the bw_files vector
     // credit: https://stackoverflow.com/a/62829166
@@ -56,11 +56,12 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
                         //std::cout << " ]" << std::endl;
 
                         //std::cout << "  into Tensor:\n";
-                        std::cout << torch::from_blob(binned_vals, {num_bins}, torch::dtype(torch::kFloat64)) << std::endl;
+                        //std::cout << torch::from_blob(binned_vals, {1,num_bins}, torch::dtype(torch::kFloat64)) << std::endl;
 
                         using namespace torch::indexing;
-                        // set bw_idx'th row of chrom_tensor to binned_vals
-                        chrom_tensor.index_put_({(int)bw_idx, "..."},
+                        // each bigWig is a column in the tensor
+                        // set bw_idx'th column of chrom_tensor to binned_vals
+                        chrom_tensor.index_put_({"...", (int)bw_idx},
                                                 torch::from_blob(binned_vals, {num_bins},
                                                                 torch::dtype(torch::kFloat64)));
                     });
