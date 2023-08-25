@@ -41,15 +41,6 @@ double NaNmean_range(std::vector<double>::iterator start, std::vector<double>::i
 }
 
 std::vector<double> bin_vec_NaNmeans(std::vector<double>& in_vec, size_t bin_size) {
-    // std::vector<size_t> bin_starts;
-    // bin_starts.reserve(n_bins);
-    // std::generate_n(std::execution::par_unseq, std::back_inserter(bin_starts), n_bins-1,
-    //                 [bin_size, i = 0]() mutable { return i++ * bin_size; }
-    // );
-    //std::cout << "bin_starts: \n";
-    //std::cout << "\tlen = " << bin_starts.size() << std::endl;
-    //std::cout << "\tfirst = " << bin_starts[0] << ", last = " << bin_starts[bin_starts.size()-1] << std::endl;
-
     // Need to handle last bin separately if it's not full,
     // so just go up to last full bin first
     size_t n_bins = ceil(in_vec.size() / bin_size);
@@ -75,34 +66,10 @@ std::vector<double> bin_vec_NaNmeans(std::vector<double>& in_vec, size_t bin_siz
     // Last bin
     auto bin_start = in_vec.begin() + (n_bins-1)*bin_size;
     auto bin_end = in_vec.end();
-    std::cout << "Last bin, indices " << (n_bins-1)*bin_size <<" to "<< in_vec.size() << ", ";
-    std::cout << "values: first = "<< *bin_start <<", last = "<< *(bin_end-1) << ", ";
     means.push_back(NaNmean_range(bin_start, bin_end));
-    std::cout << "mean = "<< NaNmean_range(bin_start, bin_end) <<" at "<< means.size() << std::endl;
 
     return means;
 }
-/*
-// Needs C++23 :(
-std::vector<double> computeMeanAverages(const std::vector<double>& input, size_t partitionSize) {
-    // Calculate the number of partitions
-    size_t numPartitions = input.size() / partitionSize;
-
-    // Create a view that partitions the input vector
-    auto partitionedView = input | std::views::chunk(partitionSize);
-
-    // Define a lambda to calculate the mean of a partition
-    auto calculateMean = [](const auto& partition) {
-        return std::accumulate(partition.begin(), partition.end(), 0.0) / partition.size();
-    };
-
-    // Use std::ranges::transform to calculate means in parallel
-    std::vector<double> meanAverages(numPartitions);
-    std::ranges::transform(std::execution::par, partitionedView, meanAverages.begin(), calculateMean);
-
-    return meanAverages;
-}
-*/
 
 torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned bin_size) {
     // ceiling division: ceil(chrom_size / bin_size)
@@ -115,7 +82,8 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
     
     // parallelize across bigWigs' indices within the bw_files vector
     // credit: https://stackoverflow.com/a/62829166
-    std::ranges::iota_view bw_idxs((size_t)0, bw_files.size());
+    std::vector<size_t> bw_idxs(bw_files.size());
+    std::iota(bw_idxs.begin(), bw_idxs.end(), 0);
     std::for_each(std::execution::par_unseq,
                     bw_idxs.begin(), bw_idxs.end(),
                     [this, chrom, bin_size, num_bins, &chrom_tensor](size_t bw_idx) {
@@ -125,21 +93,6 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
                                                         bwStatsType::doesNotExist);
                         std::vector<double> chrom_vals(vals_arr, vals_arr + chrom_sizes[chrom]);
                         std::vector<double> binned_vals = bin_vec_NaNmeans(chrom_vals, bin_size);
-                        
-                        // RETIRED: unfortunately libBigWig puts binning remainder
-                        // in _first_ bin, not last, so we can't use it
-                        //double* binned_vals = bwStats(bw_files[bw_idx], chrom.c_str(),
-                        //                            0, chrom_sizes[chrom], num_bins,
-                        //                            bwStatsType::mean);
-
-                        //std::cout << "Inserting Tensor\n";
-                        //std::cout << "  heap array from libBigWig: [";
-                        //for (int i = 0; i < num_bins; i++)
-                        //    std::cout << ' ' << binned_vals[i];
-                        //std::cout << " ]" << std::endl;
-
-                        //std::cout << "  into Tensor:\n";
-                        //std::cout << torch::from_blob(binned_vals, {1,num_bins}, torch::dtype(torch::kFloat64)) << std::endl;
 
                         using namespace torch::indexing;
                         // each bigWig is a column in the tensor
