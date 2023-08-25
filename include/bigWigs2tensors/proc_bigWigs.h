@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <ranges>
 #include <execution>
+#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -29,6 +30,13 @@ Reads a whitespace-delimited chrom_sizes file into
 a map of chromosome names to their sizes.
 */
 std::map<std::string, int> parse_chrom_sizes(const std::string& chrom_sizes_path);
+
+/*!
+Given a bin size, bins a vector of doubles into
+a vector of their mean averages.
+If any NaNs in a bin, sets result for that bin to NaN.
+*/
+std::vector<double> bin_vec_NaNmeans(const std::vector<double>& in_vec, size_t bin_size);
 
 class BWBinner
 /*!

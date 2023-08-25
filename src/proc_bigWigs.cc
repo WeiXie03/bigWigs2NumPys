@@ -1,8 +1,10 @@
 #include <vector>
+#include <array>
 #include <map>
 #include <algorithm>
 #include <ranges>
 #include <execution>
+#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -29,6 +31,79 @@ std::map<std::string, int> parse_chrom_sizes(const std::string& chrom_sizes_path
     return chrom_sizes;
 }
 
+// Note: half-open interval-based, i.e. [start, end)
+double NaNmean_range(std::vector<double>::iterator start, std::vector<double>::iterator end) {
+    // If any NaNs in bin, set result to NaN
+    if (std::any_of(start, end, [](auto val) { return std::isnan(val); }))
+        return std::nan("");
+
+    return std::accumulate(start, end, 0.0) / std::distance(start, end);
+}
+
+std::vector<double> bin_vec_NaNmeans(std::vector<double>& in_vec, size_t bin_size) {
+    // std::vector<size_t> bin_starts;
+    // bin_starts.reserve(n_bins);
+    // std::generate_n(std::execution::par_unseq, std::back_inserter(bin_starts), n_bins-1,
+    //                 [bin_size, i = 0]() mutable { return i++ * bin_size; }
+    // );
+    //std::cout << "bin_starts: \n";
+    //std::cout << "\tlen = " << bin_starts.size() << std::endl;
+    //std::cout << "\tfirst = " << bin_starts[0] << ", last = " << bin_starts[bin_starts.size()-1] << std::endl;
+
+    // Need to handle last bin separately if it's not full,
+    // so just go up to last full bin first
+    size_t n_bins = ceil(in_vec.size() / bin_size);
+    std::vector<double> means(n_bins - 1);
+    std::vector<size_t> bindx (n_bins - 1);
+    std::iota(bindx.begin(), bindx.end(), 0);
+
+    // Calculate mean means in parallel using C++17 parallel algorithms
+    std::for_each(std::execution::par_unseq,
+                    bindx.begin(), bindx.end(),
+                    [bin_size, &in_vec, &means](size_t i_bin) {
+                        std::vector<double>::iterator bin_start = in_vec.begin() + i_bin*bin_size;
+                        std::vector<double>::iterator bin_end = bin_start + bin_size;
+                        means[i_bin] = NaNmean_range(bin_start, bin_end);
+                    });
+    // std::transform(std::execution::par_unseq, bin_starts.begin(), bin_starts.begin() + n_bins-1 - 1,
+    //                std::back_inserter(means), [bin_size, &in_vec](size_t indx) -> double {
+    //                     std::vector<double>::iterator bin_start = in_vec.begin() + indx;
+    //                     std::vector<double>::iterator bin_end = in_vec.begin() + indx + bin_size;
+    //                     return NaNmean_range(bin_start, bin_end);
+    //                });
+
+    // Last bin
+    auto bin_start = in_vec.begin() + (n_bins-1)*bin_size;
+    auto bin_end = in_vec.end();
+    std::cout << "Last bin, indices " << (n_bins-1)*bin_size <<" to "<< in_vec.size() << ", ";
+    std::cout << "values: first = "<< *bin_start <<", last = "<< *(bin_end-1) << ", ";
+    means.push_back(NaNmean_range(bin_start, bin_end));
+    std::cout << "mean = "<< NaNmean_range(bin_start, bin_end) <<" at "<< means.size() << std::endl;
+
+    return means;
+}
+/*
+// Needs C++23 :(
+std::vector<double> computeMeanAverages(const std::vector<double>& input, size_t partitionSize) {
+    // Calculate the number of partitions
+    size_t numPartitions = input.size() / partitionSize;
+
+    // Create a view that partitions the input vector
+    auto partitionedView = input | std::views::chunk(partitionSize);
+
+    // Define a lambda to calculate the mean of a partition
+    auto calculateMean = [](const auto& partition) {
+        return std::accumulate(partition.begin(), partition.end(), 0.0) / partition.size();
+    };
+
+    // Use std::ranges::transform to calculate means in parallel
+    std::vector<double> meanAverages(numPartitions);
+    std::ranges::transform(std::execution::par, partitionedView, meanAverages.begin(), calculateMean);
+
+    return meanAverages;
+}
+*/
+
 torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned bin_size) {
     // ceiling division: ceil(chrom_size / bin_size)
     // credit: https://stackoverflow.com/a/2745086
@@ -43,11 +118,19 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
     std::ranges::iota_view bw_idxs((size_t)0, bw_files.size());
     std::for_each(std::execution::par_unseq,
                     bw_idxs.begin(), bw_idxs.end(),
-                    [this, chrom, num_bins, &chrom_tensor](size_t bw_idx) {
-                        // the whole chrom for this bigWig
-                        double* binned_vals = bwStats(bw_files[bw_idx], chrom.c_str(),
-                                                    0, chrom_sizes[chrom], num_bins,
-                                                    bwStatsType::mean);
+                    [this, chrom, bin_size, num_bins, &chrom_tensor](size_t bw_idx) {
+                        // the whole chrom for this bigWig, including missing vals
+                        double* vals_arr = bwStats(bw_files[bw_idx], chrom.c_str(),
+                                                        0, chrom_sizes[chrom], chrom_sizes[chrom],
+                                                        bwStatsType::doesNotExist);
+                        std::vector<double> chrom_vals(vals_arr, vals_arr + chrom_sizes[chrom]);
+                        std::vector<double> binned_vals = bin_vec_NaNmeans(chrom_vals, bin_size);
+                        
+                        // RETIRED: unfortunately libBigWig puts binning remainder
+                        // in _first_ bin, not last, so we can't use it
+                        //double* binned_vals = bwStats(bw_files[bw_idx], chrom.c_str(),
+                        //                            0, chrom_sizes[chrom], num_bins,
+                        //                            bwStatsType::mean);
 
                         //std::cout << "Inserting Tensor\n";
                         //std::cout << "  heap array from libBigWig: [";
@@ -62,7 +145,7 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
                         // each bigWig is a column in the tensor
                         // set bw_idx'th column of chrom_tensor to binned_vals
                         chrom_tensor.index_put_({"...", (int)bw_idx},
-                                                torch::from_blob(binned_vals, {num_bins},
+                                                torch::from_blob(binned_vals.data(), {num_bins},
                                                                 torch::dtype(torch::kFloat64)));
                     });
 

@@ -46,9 +46,7 @@ TEST_CASE("mono alternate 0/1 toy data") {
         /* expected binned (out)
         chr1: 0.5 0.5 0.5 0.5 0.5
         chr2: 0.5 0.5
-        note: libbigwig weird, bins from end,
-        leaving remainders at __beginning__
-        chr3: 0 0.5 0.5 0.5
+        chr3: 0.5 0.5 0.5 0
         */
 
         binner.load_bin_all_chroms(2);
@@ -65,7 +63,7 @@ TEST_CASE("mono alternate 0/1 toy data") {
         // check(binned_chroms["chr2"].equal( torch::full({2}, 0.5, constants::tensor_opts) ));
         // chr3
         std::cout << "binned chr3:\n" << binned_chroms["chr3"] << std::endl;
-        // check(binned_chroms["chr3"].equal( torch::tensor({0, 0.5, 0.5, 0.5}, constants::tensor_opts) ));
+        // check(binned_chroms["chr3"].equal( torch::tensor({0.5, 0.5, 0.5, 0}, constants::tensor_opts) ));
 
         binner.save_binneds(bwFstem+"_out");
     }
