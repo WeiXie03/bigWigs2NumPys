@@ -34,7 +34,7 @@ std::map<std::string, int> parse_chrom_sizes(const std::string& chrom_sizes_path
 // Note: half-open interval-based, i.e. [start, end)
 double NaNmean_range(std::vector<double>::iterator start, std::vector<double>::iterator end) {
     // If any NaNs in bin, set result to NaN
-    if (std::any_of(start, end, [](auto val) { return std::isnan(val); }))
+    if (std::any_of(start, end, [](double val) { return std::isnan(val); }))
         return std::nan("");
 
     return std::accumulate(start, end, 0.0) / std::distance(start, end);
@@ -43,7 +43,7 @@ double NaNmean_range(std::vector<double>::iterator start, std::vector<double>::i
 std::vector<double> bin_vec_NaNmeans(std::vector<double>& in_vec, size_t bin_size) {
     // Need to handle last bin separately if it's not full,
     // so just go up to last full bin first
-    size_t n_bins = ceil(in_vec.size() / bin_size);
+    size_t n_bins = ceil(double(in_vec.size()) / double(bin_size));
     std::vector<double> means(n_bins - 1);
     std::vector<size_t> bindx (n_bins - 1);
     std::iota(bindx.begin(), bindx.end(), 0);
@@ -84,6 +84,13 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
     // credit: https://stackoverflow.com/a/62829166
     std::vector<size_t> bw_idxs(bw_files.size());
     std::iota(bw_idxs.begin(), bw_idxs.end(), 0);
+
+    std::cout << "bw_idxs: [";
+    for (auto& idx : bw_idxs) {
+        std::cout << idx << ", ";
+    }
+    std::cout << "]" << std::endl;
+
     std::for_each(std::execution::par_unseq,
                     bw_idxs.begin(), bw_idxs.end(),
                     [this, chrom, bin_size, num_bins, &chrom_tensor](size_t bw_idx) {
@@ -92,7 +99,19 @@ torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned
                                                         0, chrom_sizes[chrom], chrom_sizes[chrom],
                                                         bwStatsType::doesNotExist);
                         std::vector<double> chrom_vals(vals_arr, vals_arr + chrom_sizes[chrom]);
+
+                        // std::cout << "Loaded " << chrom_vals.size() << " values for " << bw_paths[bw_idx].stem().string() << ": [";
+                        // for (double val : chrom_vals) {
+                        //     std::cout << " " << val;
+                        // }
+                        // std::cout << " ]" << std::endl;
+
                         std::vector<double> binned_vals = bin_vec_NaNmeans(chrom_vals, bin_size);
+                        // std::cout << "Binned result: [";
+                        // for (double val : binned_vals) {
+                        //     std::cout << " " << val;
+                        // }
+                        // std::cout << "... ]"  << std::endl;
 
                         using namespace torch::indexing;
                         // each bigWig is a column in the tensor
@@ -109,8 +128,8 @@ std::map<std::string, torch::Tensor> BWBinner::load_bin_all_chroms(unsigned bin_
     // parallelize over chromosomes
     std::for_each(std::execution::par_unseq,
         chrom_sizes.begin(), chrom_sizes.end(),
-        //std::pair<std::string, int>
         [this, bin_size](auto& chr_entry) {
+            // std::cout << "Binning " << chr_entry.first << std::endl;
             chrom_binneds[chr_entry.first] = BWBinner::load_bin_chrom_tensor(chr_entry.first, bin_size);
         }
     );
