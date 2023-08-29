@@ -2,7 +2,6 @@
 #include <array>
 #include <map>
 #include <algorithm>
-#include <ranges>
 #include <execution>
 #include <cmath>
 #include <iostream>
