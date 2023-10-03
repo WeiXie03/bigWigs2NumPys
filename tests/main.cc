@@ -123,3 +123,17 @@ TEST_CASE("combined toy datas") {
 
     binner.save_binneds("combined_out");
 }
+
+TEST_CASE("specify coords on combined toy datas") {
+    std::vector<std::string> bw_paths = find_paths_filetype(DATA_DIR, ".bw");
+    std::filesystem::path chrom_sizes_path = DATA_DIR / ("toy.chrom.sizes");
+    std::filesystem::path coords_bed_path = DATA_DIR / ("toy.coords.bigBed");
+
+    BWBinner binner(bw_paths, chrom_sizes_path.string(), coords_bed_path.string());
+    REQUIRE(binner.binned_chroms().size() == 0);
+
+    binner.load_bin_all_chroms(2);
+    std::map<std::string, torch::Tensor> binned_chroms = binner.binned_chroms();
+
+    binner.save_binneds("subset_combined_out");
+}

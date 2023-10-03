@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <torch/torch.h>
 #include <bigWig.h>
+#include <bigWigs2tensors/util.h>
 
 namespace constants {
     static const torch::TensorOptions tensor_opts = torch::TensorOptions()
@@ -44,6 +45,37 @@ a "manager" for binning a set of "alignable" bigWig files together
 {
 public:
     /*!
+    Constructs a BWBinner object that will bin the specified intervals of the bigWig files
+    Args:
+        bw_paths: a NULL-terminated array of paths to bigWig files
+        chrom_sizes_path: path to a whitespace-delimited file of chromosome sizes
+        coords_bed_path: optional path to a bed file of coordinates to bin over
+    */
+    BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path, const std::string& coords_bed_path)
+        : bw_files(open_bigWigs(bigWig_paths)),
+        num_bws(bw_files.size()),
+        chrom_sizes(parse_chrom_sizes(chrom_sizes_path)),
+        tens_opts(constants::tensor_opts)
+    {
+        // Parse the coordinates bed file
+        parse_coords_bed(spec_coords, coords_bed_path, chrom_sizes);
+        for (const auto& [chr, interv] : spec_coords) {
+            std::cout << chr <<": "<< interv->l <<" intervals"<< std::endl;
+            std::cout << '\t';
+            for (int i = 0; i < interv->l; i++) {
+                std::cout << ' ' << interv->start[i] << '-' << interv->end[i];
+            };
+            std::cout << std::endl;
+        }
+
+        std::transform(bigWig_paths.cbegin(), bigWig_paths.cend(),
+                       std::back_inserter(bw_paths),
+                       [](const std::string& path) {
+                           return std::filesystem::path(path);
+                       });
+    }
+
+    /*!
     Constructs a BWBinner object that will bin the bigWig files
     Args:
         bw_paths: a NULL-terminated array of paths to bigWig files
@@ -55,6 +87,37 @@ public:
         chrom_sizes(parse_chrom_sizes(chrom_sizes_path)),
         tens_opts(constants::tensor_opts)
     {
+        // Will use entire chromosomes <=> "full" coordinates <=> 0 to chrom_size
+        std::transform(chrom_sizes.begin(), chrom_sizes.end(),
+                            std::inserter(spec_coords, spec_coords.end()),
+                            [this](const std::pair<std::string, int>& chrom_size) {
+                                std::string chrom = chrom_size.first;
+                                unsigned size = chrom_size.second;
+
+                                bbOverlappingEntries_t* entries = new bbOverlappingEntries_t;
+                        
+                                uint32_t* starts = new uint32_t[1];
+                                starts[0] = 0;
+                                entries->start = starts;
+
+                                uint32_t* ends = new uint32_t[1];
+                                starts[0] = size;
+                                entries->end = ends;
+
+                                entries->l = 1;
+                                entries->m = 1;
+
+                                return std::make_pair(chrom, entries);
+                            });
+        for (const auto& [chr, interv] : spec_coords) {
+            std::cout << chr <<": "<< interv->l <<" intervals"<< std::endl;
+            std::cout << '\t';
+            for (int i = 0; i < interv->l; i++) {
+                std::cout << ' ' << interv->start[i] << '-' << interv->end[i];
+            };
+            std::cout << std::endl;
+        }
+
         std::transform(bigWig_paths.cbegin(), bigWig_paths.cend(),
                        std::back_inserter(bw_paths),
                        [](const std::string& path) {
@@ -63,6 +126,12 @@ public:
     }
 
     ~BWBinner() {
+        std::for_each(spec_coords.begin(), spec_coords.end(),
+                      [](std::pair<std::string, bbOverlappingEntries_t*> entry) {
+                          delete[] entry.second->start;
+                          delete[] entry.second->end;
+                          delete entry.second;
+                      });
         for (auto& bw : bw_files) {
             bwClose(bw);
         }
@@ -95,8 +164,11 @@ public:
 private:
     std::vector<std::filesystem::path> bw_paths;
     std::vector<bigWigFile_t*> bw_files;
-    unsigned num_bws;
+    unsigned int num_bws;
     std::map<std::string, int> chrom_sizes;
+    // entries are {chrom: bbOverlappingEntries_t*}
+    //  '-> key struct members are array of starts, array of ends, and number of entries
+    std::map<std::string, bbOverlappingEntries_t*> spec_coords;
     std::map<std::string, torch::Tensor> chrom_binneds;
     torch::TensorOptions tens_opts;
 
