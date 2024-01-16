@@ -4,6 +4,7 @@
 #include <fstream>
 #include <filesystem>
 #include <tclap/CmdLine.h>
+#include <tclap/Arg.h>
 #include <bigWigs2tensors/util.h>
 #include <bigWigs2tensors/proc_bigWigs.h>
 
@@ -13,6 +14,7 @@ tracks: EITHER...
     - unlimited -t <name: str> <path: str>'s, or
     - one -T <path: str> to a directory with all the bigWigs
 chrom sizes: one -s <path: str>
+_OPTIONAL_: one -c <path: str> to a bed file specifying the genomic coordinates _within __every__ bigWig_ to bin over
 */
 
 int main(int argc, char** argv) {
@@ -24,11 +26,13 @@ int main(int argc, char** argv) {
         // TCLAP::UnlabeledMultiArg<std::string> tracks("tracks", "bigWig files to bin", true, "name: str path: str");
         TCLAP::ValueArg<std::string> tracks_dir("T", "tracks-dir", "directory containing all bigWig files to bin", true, "", "path (string)");
         TCLAP::ValueArg<std::string> chrom_sizes("s", "chrom-sizes", "chromosome sizes file", true, "", "path (string)");
+        TCLAP::ValueArg<std::string> coords_bed("c", "coords-bigBed", "bigBed file of genomic coordinates within all bigWigs to bin over", false, "", "path (string)");
         TCLAP::UnlabeledValueArg<std::string> out_dir("out-dir", "directory to write binned tensors to", true, "", "path (string)");
         TCLAP::SwitchArg verbose("v", "verbose", "print verbose output", false);
         cmd.add(tracks_dir);
         cmd.add(chrom_sizes);
         cmd.add(res);
+        cmd.add(coords_bed);
         cmd.add(out_dir);
         cmd.add(verbose);
         cmd.parse(argc, argv);
@@ -37,6 +41,7 @@ int main(int argc, char** argv) {
             std::cout << "resolution: " << res.getValue() << std::endl;
             std::cout << "tracks dir: " << tracks_dir.getValue() << std::endl;
             std::cout << "chrom sizes: " << chrom_sizes.getValue() << std::endl;
+            std::cout << "coords bed: " << coords_bed.getValue() << std::endl;
             std::cout << "out dir: " << out_dir.getValue() << std::endl;
 
             std::cout << "Note: assuming all bigWig files' extension is '.bigWig'" << std::endl;
@@ -62,9 +67,18 @@ int main(int argc, char** argv) {
         //     bw_names.push_back(name);
         // }
 
+        chroms_coords_map_t coords_map;
         std::string chrom_sizes_path = chrom_sizes.getValue();
-
-        BWBinner bwb(bw_paths, chrom_sizes_path);
+        std::map<std::string,int> chr_sizes_map = parse_chrom_sizes(chrom_sizes_path);
+        if (coords_bed.isSet()) {
+            std::cout << "Parsing coordinates bigBed..." << std::endl;
+            coords_map = parse_coords_bigBed(coords_bed.getValue(), chr_sizes_map);
+        }
+        else {
+            coords_map = make_full_chroms_coords_map(chr_sizes_map);
+        }
+        std::cout << "Done parsing coordinates bigBed." << std::endl;
+        BWBinner bwb(bw_paths, chrom_sizes_path, coords_map);
 
         std::cout << "Binning bigWigs..." << std::endl;
         auto binned = bwb.load_bin_all_chroms(res.getValue());

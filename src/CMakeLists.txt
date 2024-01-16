@@ -1,7 +1,7 @@
 file(GLOB HEADER_LIST CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/lib${PROJECT_NAME}/*.h")
 
 add_library(lib${PROJECT_NAME} SHARED
-    proc_bigWigs.cc util.cc
+    util.cc proc_bigWigs.cc
     ${HEADER_LIST}
 )
 

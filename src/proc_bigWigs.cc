@@ -19,18 +19,7 @@ std::vector<bigWigFile_t*> open_bigWigs(const std::vector<std::string>& bw_paths
     return bw_files;
 }
 
-std::map<std::string, int> parse_chrom_sizes(const std::string& chrom_sizes_path) {
-    std::map<std::string, int> chrom_sizes;
-    std::ifstream chrom_sizes_file(chrom_sizes_path);
-    std::string chrom;
-    int size;
-    while (chrom_sizes_file >> chrom >> size) {
-        chrom_sizes[chrom] = size;
-    }
-    return chrom_sizes;
-}
-
-// Note: half-open interval-based, i.e. [start, end)
+// Note: half-open 0-based, i.e. [start, end)
 double NaNmean_range(std::vector<double>::iterator start, std::vector<double>::iterator end) {
     // If any NaNs in bin, set result to NaN
     if (std::any_of(start, end, [](double val) { return std::isnan(val); }))
@@ -70,6 +59,62 @@ std::vector<double> bin_vec_NaNmeans(std::vector<double>& in_vec, size_t bin_siz
     return means;
 }
 
+// TODO: convert to take in map of bbOverlappingEntries_t* instead of coords specification
+// bigBed path and convert the no speicification constructor to delegate to this one?
+BWBinner::BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path, const std::map<std::string, bbOverlappingEntries_t*>& coords_map)
+    : bw_files(open_bigWigs(bigWig_paths)),
+    num_bws(bw_files.size()),
+    chrom_sizes(parse_chrom_sizes(chrom_sizes_path)),
+    tens_opts(constants::tensor_opts),
+    spec_coords(coords_map)
+{
+    // Parse the coordinates bed file
+    //spec_coords = parse_coords_bigBed(coords_bed_path, chrom_sizes);
+    for (const auto& [chr, interv] : spec_coords) {
+        std::cout << chr <<": "<< interv->l <<" intervals"<< std::endl;
+        std::cout << '\t';
+        for (int i = 0; i < interv->l; i++) {
+            std::cout << ' ' << interv->start[i] << '-' << interv->end[i];
+        };
+        std::cout << std::endl;
+    }
+
+    std::transform(bigWig_paths.cbegin(), bigWig_paths.cend(),
+                    std::back_inserter(bw_paths),
+                    [](const std::string& path) {
+                        return std::filesystem::path(path);
+                    });
+}
+
+BWBinner::BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path)
+    : BWBinner(bigWig_paths, chrom_sizes_path,
+                make_full_chroms_coords_map(parse_chrom_sizes(chrom_sizes_path)))
+    {
+    std::transform(bigWig_paths.cbegin(), bigWig_paths.cend(),
+                    std::back_inserter(bw_paths),
+                    [](const std::string& path) {
+                        return std::filesystem::path(path);
+                    });
+}
+
+BWBinner::~BWBinner() {
+    std::cout << "BWBinner shutting down" << std::endl;
+    for (auto& bw : bw_files) {
+        bwClose(bw);
+    }
+    // coordinates specification map
+    std::cout << "Cleaning up coordinates specification map, currently "<< spec_coords.size() <<" entries..." << std::endl;
+    for (auto& [chr, interv] : spec_coords) {
+        bbDestroyOverlappingEntries(interv);
+    }
+    bwCleanup();
+    // final Torch tensors
+    chrom_binneds.clear();
+}
+
+// TODO: convert to loop sequentially over all specified coords in this chrom,
+//       load bwStats(bw_files[bw_idx], chrom.c_str(), start, end, end-start, bwStatsType::doesNotExist);
+//       throw into one big Tensor, one row per interval?
 torch::Tensor BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned bin_size) {
     // ceiling division: ceil(chrom_size / bin_size)
     // credit: https://stackoverflow.com/a/2745086
@@ -146,8 +191,10 @@ void BWBinner::save_binneds(const std::string& out_dir) const {
         std::filesystem::create_directory(out_dir_p);
     }
 
+    //std::cout << "in save_binneds(): chrom_binneds.size() = " << chrom_binneds.size() << std::endl;
     for (const auto& [chrom, size] : chrom_sizes) {
         // save this chrom's binned tensor
+        //std::cout << "in save_binneds(): saving " << chrom << std::endl;
         auto bytes = torch::pickle_save(chrom_binneds.at(chrom));
         std::ofstream chr_stream{out_dir_p / (chrom + ".pt")};
         chr_stream.write(bytes.data(), bytes.size());

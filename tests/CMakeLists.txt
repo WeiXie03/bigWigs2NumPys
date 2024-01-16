@@ -14,11 +14,19 @@ target_include_directories(
 )
 
 add_executable(
-    test
-    main.cc
-    ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/util.h
-    ${PROJECT_SOURCE_DIR}/src/util.cc
+   test
+   main.cc
+   ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/util.h
+   ${PROJECT_SOURCE_DIR}/src/util.cc
 )
-
 target_include_directories(test PUBLIC ${CMAKE_SOURCE_DIR}/include ../extern/libBigWig)
 target_link_libraries(test libBigWig torch doctest lib${PROJECT_NAME})
+
+#add_executable(
+#    test_no_doctest
+#    main_no_doctest.cc
+#    ${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}/util.h
+#    ${PROJECT_SOURCE_DIR}/src/util.cc
+#)
+#target_include_directories(test_no_doctest PUBLIC ${CMAKE_SOURCE_DIR}/include ../extern/libBigWig)
+#target_link_libraries(test_no_doctest libBigWig torch lib${PROJECT_NAME})
