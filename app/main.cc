@@ -18,7 +18,6 @@ _OPTIONAL_: one -c <path: str> to a bed file specifying the genomic coordinates 
 */
 
 int main(int argc, char** argv) {
-
     try {
         TCLAP::CmdLine cmd("bigWigs binner that converts bigWigs to (pickled) PyTorch tensor files",
                         ' ', "0.1");
@@ -66,6 +65,12 @@ int main(int argc, char** argv) {
         //     bw_paths.push_back(path);
         //     bw_names.push_back(name);
         // }
+
+        //Initialize enough space to hold 128KiB (1<<17) of data at a time
+        if(bwInit(1<<17) != 0) {
+            fprintf(stderr, "Received an error in bwInit\n");
+            return 1;
+        }
 
         chroms_coords_map_t coords_map;
         std::string chrom_sizes_path = chrom_sizes.getValue();

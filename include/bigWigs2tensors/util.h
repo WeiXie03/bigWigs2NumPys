@@ -33,6 +33,18 @@ references to all the intervals specified, within a bbOverlappingEntries_t per c
 */
 chroms_coords_map_t parse_coords_bigBed(const std::string& coords_bed_path, const std::map<std::string, int>& chrom_sizes);
 
+/*!
+Returns the number of bins fully covered by the interval [start, end) with given bin size.
+*/
+unsigned num_bins_intersect_interval(unsigned start, unsigned end, unsigned bin_size);
+
+/*!
+Generates a "binned copy" of the given bbOverlappingEntries_t, where each interval is the
+starting bin and ending bin of the original interval after binning with given bin size.
+The interval values are set to the number of bins in the interval.
+*/
+bwOverlappingIntervals_t* bin_coords(const bbOverlappingEntries_t* coords, unsigned bin_size);
+
 /*
 Returns a map of the same type as parse_coords_bigBed() for all chromosomes given in chrom_sizes
 but with all intervals.

@@ -1,0 +1,4 @@
+I'm writing a concurrent C++ program that performs the same set of operations for each of a list of elements. I have a `BWBinner` class managing all the metadata, data and containers needed. The set of operations involve looking up some specific metadata about each element in order to then set a respective PyTorch tensor. Currently, I am parallelizing over identifying keys of the elements, looking up each's metadata in one big map, and using `std::transform` with an "elementary" function to store returned tensors in another single big map owned by the `BWBinner` object. Would it be better to use `for_each` and `emplace` instead of returning each tensor?
+
+>[!note]
+>libBigWig indices, starts, ends are _all_ __0-based half open__. For example, `start=0`, `end=5` <=> $[0,5)$ <=> $(0,1,2,3,4)$.

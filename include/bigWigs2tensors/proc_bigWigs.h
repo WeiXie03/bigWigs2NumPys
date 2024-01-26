@@ -62,7 +62,7 @@ public:
     by calling `load_bin_chrom_tensor` on each chromosome.
     \arg bin_size The size of the bins to use.
     */
-    std::map<std::string, torch::Tensor> load_bin_all_chroms(unsigned bin_size);
+    const std::map<std::string, torch::Tensor>& load_bin_all_chroms(unsigned bin_size);
 
     /*!
     Data getter for the binned data for all chromosomes.
@@ -90,11 +90,21 @@ private:
     std::map<std::string, torch::Tensor> chrom_binneds;
     torch::TensorOptions tens_opts;
 
+    // Loads all the data (binned series of values) for the `interv_idx`'th interval
+    // for chromosome `chrom` into a torch Tensor, each bigWig a column and each row a bin.
+
+    /*!
+    Loads all the data (binned series of values) for the given bigWig for chromosome `chrom`
+    into a torch Tensor, each row being a bin. Pre-computed bin intervals passed from
+    `load_bin_chrom_tensor`, match the `spec_coords` intervals by index.
+    */
+    void load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_idx, const std::vector<unsigned>& start_bindxs, unsigned bin_size, unsigned num_bins);
+
     /*!
     Loads all the data (binned series of values) for chromosome `chrom`
-    into a torch Tensor, one row per bigWig file.
+    into the respective torch Tensor in the map, one column per bigWig file.
     */
-    torch::Tensor load_bin_chrom_tensor(const std::string& chrom, unsigned bin_size);
+    void load_bin_chrom_tensor(const std::string& chrom, unsigned bin_size);
 };
 
 #endif

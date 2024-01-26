@@ -92,7 +92,7 @@ TEST_CASE("sequential with missings toy data") {
         /* expected binned (out)
         chr1: - 0.5 2.5 - 0.5
         chr2: 0.5 2.5
-        chr3: - - 0.5 -
+        chr3: - - 1.5 -
         */
 
         binner.load_bin_all_chroms(2);
@@ -124,29 +124,41 @@ TEST_CASE("combined toy datas") {
 
     binner.load_bin_all_chroms(2);
     std::map<std::string, torch::Tensor> binned_chroms = binner.binned_chroms();
+    // chr1
+    std::cout << "binned chr1:\n" << binned_chroms["chr1"] << std::endl;
+    // chr2
+    std::cout << "binned chr2:\n" << binned_chroms["chr2"] << std::endl;
+    // chr3
+    std::cout << "binned chr3:\n" << binned_chroms["chr3"] << std::endl;
 
     binner.save_binneds("combined_out");
 }
 
 TEST_CASE("parse bigBed for specifying coordinates") {
+    std::cout << "\n========================\n";
+
     std::filesystem::path coords_bed_path = DATA_DIR / ("toy.coords.bigBed");
-    std::map<std::string,int> seq_miss_chrom_sizes = parse_chrom_sizes((DATA_DIR / ("test_sequential_missing.chrom.sizes")).string());
+    std::cout << "coords_bed_path: " << coords_bed_path << std::endl;
+
+    std::map<std::string,int> seq_miss_chrom_sizes = parse_chrom_sizes((DATA_DIR / ("toy.chrom.sizes")).string());
     std::map<std::string, bbOverlappingEntries_t*> spec_coords = parse_coords_bigBed(coords_bed_path.string(), seq_miss_chrom_sizes);
-    for (const auto& [chr, interv] : spec_coords) {
+    for (auto& [chr, interv] : spec_coords) {
         std::cout << chr <<": "<< interv->l <<" intervals"<< std::endl;
         std::cout << '\t';
         for (int i = 0; i < interv->l; i++) {
             std::cout << ' ' << interv->start[i] << '-' << interv->end[i];
         };
         std::cout << std::endl;
+        if (interv) bbDestroyOverlappingEntries(interv);
     }
+    bwCleanup();
 }
 
 TEST_CASE("specify coords on sequential missing toy data") {
     std::vector<std::string> bw_paths = find_paths_filetype(DATA_DIR, ".bw");
-    std::map<std::string,int> seq_miss_chrom_sizes = parse_chrom_sizes((DATA_DIR / ("test_sequential_missing.chrom.sizes")).string());
-    std::filesystem::path chrom_sizes_path = DATA_DIR / ("test_sequential_missing.chrom.sizes");
-    std::filesystem::path coords_bed_path = DATA_DIR / ("test_sequential_missing.coords.bigBed");
+    std::map<std::string,int> seq_miss_chrom_sizes = parse_chrom_sizes((DATA_DIR / ("toy.chrom.sizes")).string());
+    std::filesystem::path chrom_sizes_path = DATA_DIR / ("toy.chrom.sizes");
+    std::filesystem::path coords_bed_path = DATA_DIR / ("toy.coords.bigBed");
 
     BWBinner binner(bw_paths, chrom_sizes_path.string(), parse_coords_bigBed(coords_bed_path.string(), seq_miss_chrom_sizes));
     REQUIRE(binner.binned_chroms().size() == 0);
@@ -154,5 +166,16 @@ TEST_CASE("specify coords on sequential missing toy data") {
     binner.load_bin_all_chroms(2);
     std::map<std::string, torch::Tensor> binned_chroms = binner.binned_chroms();
 
+    // chr1
+    std::cout << "binned chr1:\n" << binned_chroms["chr1"] << std::endl;
+    // CHECK(binned_chroms["chr1"].equal( torch::full({5}, 0.5, constants::tensor_opts) ));
+    // chr2
+    std::cout << "binned chr2:\n" << binned_chroms["chr2"] << std::endl;
+    // CHECK(binned_chroms["chr2"].equal( torch::full({2}, 0.5, constants::tensor_opts) ));
+    // chr3
+    std::cout << "binned chr3:\n" << binned_chroms["chr3"] << std::endl;
+
     binner.save_binneds("subset_seq_miss_out");
+
+    bwCleanup();
 }
