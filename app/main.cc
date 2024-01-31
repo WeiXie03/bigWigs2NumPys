@@ -8,52 +8,73 @@
 #include <bigWigs2tensors/util.h>
 #include <bigWigs2tensors/proc_bigWigs.h>
 
+/*!
+Merge all given paths and matching paths within given directories into a single vector and return it.
+tracks_list is a list of paths to bigWig files and/or directories containing bigWig files to bin over,
+directly from the TCLAP interface.
+*/
+std::vector<std::string> parse_tracks_list(const std::vector<std::string>& tracks_list, const std::string& file_ext) {
+    std::vector<std::string> paths;
+    for (auto& path : tracks_list) {
+        if (std::filesystem::is_directory(path)) {
+            std::vector<std::string> dir_paths = find_paths_filetype(path, file_ext);
+            paths.insert(paths.end(), dir_paths.begin(), dir_paths.end());
+        }
+        else if (std::filesystem::is_regular_file(path)) {
+            paths.push_back(path);
+        }
+        else std::cerr << "Invalid track path specified: " << path << std::endl;
+    }
+    return paths;
+}
+
 /*
  * Usage *
-tracks: EITHER...
-    - unlimited -t <name: str> <path: str>'s, or
-    - one -T <path: str> to a directory with all the bigWigs
-chrom sizes: one -s <path: str>
-_OPTIONAL_: one -c <path: str> to a bed file specifying the genomic coordinates _within __every__ bigWig_ to bin over
+ bigWigs2tensors -r <resolution: unsigned int> [-c <coords BED: str>] -s <chrom sizes> -o <out-dir: str> -t <track: str> [-t <track: str> ...]
+    * Options *
+    track: a path to one of the bigWig files and/or directories containing bigWig files to bin over
+    chrom sizes: one -s <path: str>
+    _OPTIONAL_
+    coords BED: one -c <path: str> to a bed file specifying the genomic coordinates _within __every__ bigWig_ to bin over
 */
 
 int main(int argc, char** argv) {
     try {
         TCLAP::CmdLine cmd("bigWigs binner that converts bigWigs to (pickled) PyTorch tensor files",
                         ' ', "0.1");
-        TCLAP::ValueArg<unsigned> res("r", "resolution", "resolution (bin size) in base pairs", false, 100, "unsigned (>= 0) int");
-        // TCLAP::UnlabeledMultiArg<std::string> tracks("tracks", "bigWig files to bin", true, "name: str path: str");
-        TCLAP::ValueArg<std::string> tracks_dir("T", "tracks-dir", "directory containing all bigWig files to bin", true, "", "path (string)");
-        TCLAP::ValueArg<std::string> chrom_sizes("s", "chrom-sizes", "chromosome sizes file", true, "", "path (string)");
-        TCLAP::ValueArg<std::string> coords_bed("c", "coords-bigBed", "bigBed file of genomic coordinates within all bigWigs to bin over", false, "", "path (string)");
-        TCLAP::UnlabeledValueArg<std::string> out_dir("out-dir", "directory to write binned tensors to", true, "", "path (string)");
-        TCLAP::SwitchArg verbose("v", "verbose", "print verbose output", false);
-        cmd.add(tracks_dir);
-        cmd.add(chrom_sizes);
-        cmd.add(res);
-        cmd.add(coords_bed);
-        cmd.add(out_dir);
-        cmd.add(verbose);
+        TCLAP::ValueArg<unsigned> res("r", "resolution", "resolution (bin size) in base pairs", false, 100, "unsigned (>= 0) int", cmd);
+        // TCLAP::UnlabeledMultiArg<std::string> tracks("tracks", "bigWig files to bin", true, "name: str path: str", cmd);
+        TCLAP::MultiArg<std::string> tracks_list("t", "tracks-list", "a list of paths of bigWig files and/or directories containing bigWig files to bin over", true, "path (string)", cmd);
+        TCLAP::ValueArg<std::string> chrom_sizes("s", "chrom-sizes", "chromosome sizes file", true, "", "path (string)", cmd);
+        TCLAP::ValueArg<std::string> coords_bed("c", "coords-bigBed", "bigBed file of genomic coordinates within all bigWigs to bin over", false, "", "path (string)", cmd);
+        TCLAP::UnlabeledValueArg<std::string> out_dir("out-dir", "directory to write binned tensors to", true, "", "path (string)", cmd);
+        TCLAP::SwitchArg verbose("v", "verbose", "print verbose output", cmd, false);
         cmd.parse(argc, argv);
 
         if (verbose.getValue()) {
             std::cout << "resolution: " << res.getValue() << std::endl;
-            std::cout << "tracks dir: " << tracks_dir.getValue() << std::endl;
             std::cout << "chrom sizes: " << chrom_sizes.getValue() << std::endl;
             std::cout << "coords bed: " << coords_bed.getValue() << std::endl;
             std::cout << "out dir: " << out_dir.getValue() << std::endl;
 
+            std::cout << tracks_list.getValue().size() << " track arguments given." << std::endl;
+            std::cout << "tracks list: [";
+            for (auto& track : tracks_list.getValue()) {
+                std::cout << '\t' << track << std::endl;
+            }
+            std::cout << "]" << std::endl;
+
             std::cout << "Note: assuming all bigWig files' extension is '.bigWig'" << std::endl;
         }
 
-        // For now, we'll just assume that the user has given us a directory
-        std::vector<std::string> bw_paths = find_paths_filetype(tracks_dir.getValue(), ".bigWig");
+        // TODO: all given paths in tracks_list
+        std::vector<std::string> bw_paths = parse_tracks_list(tracks_list.getValue(), ".bigWig");
         if (bw_paths.size() == 0) {
-            std::cerr << "No bigWig files found in " << tracks_dir.getValue() << std::endl;
+            std::cerr << "No bigWig files found in given tracks list." << std::endl;
             return 1;
         }
         if (verbose.getValue()) {
-            std::cout << "Found " << bw_paths.size() << " bigWig files in " << tracks_dir.getValue() <<":\n";
+            std::cout << "Found " << bw_paths.size() << " bigWig files in " << tracks_list.getValue() <<":\n";
             for (auto& path : bw_paths) {
                 std::cout << '\t' << path << std::endl;
             }

@@ -66,7 +66,7 @@ BWBinner::BWBinner(const std::vector<std::string>& bigWig_paths, const std::stri
     tens_opts(constants::tensor_opts),
     spec_coords(coords_map)
 {
-    std::cout << "\n=========================\n";
+    // std::cout << "\n=========================\n";
 
     // Parse the coordinates bed file
     //spec_coords = parse_coords_bigBed(coords_bed_path, chrom_sizes);
@@ -91,12 +91,11 @@ BWBinner::BWBinner(const std::vector<std::string>& bigWig_paths, const std::stri
                 make_full_chroms_coords_map(parse_chrom_sizes(chrom_sizes_path))) {}
 
 BWBinner::~BWBinner() {
-    std::cout << "BWBinner shutting down" << std::endl;
+    // std::cout << "BWBinner shutting down" << std::endl;
     for (auto& bw : bw_files) {
         bwClose(bw);
     }
     // coordinates specification map
-    // std::cout << "Cleaning up coordinates specification map, currently "<< spec_coords.size() <<" entries..." << std::endl;
     for (auto& [chr, interv] : spec_coords) {
         bbDestroyOverlappingEntries(interv);
     }
@@ -119,7 +118,7 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
     std::iota(interv_idxs.begin(), interv_idxs.end(), 0);
 
     // TODO: check all values in spec_coords with debugger
-    std::for_each(//std::execution::par_unseq,
+    std::for_each(std::execution::par_unseq,
                     interv_idxs.begin(), interv_idxs.end(),
                     [this, chrom, bw_idx, &chrom_coords, &start_bindxs, bin_size, num_bins](size_t interv_idx) {
                         // each bigWig is a column in the tensor
@@ -142,25 +141,25 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
                                                             bwStatsType::doesNotExist);
                             std::vector<double> chrom_vals(vals_arr, vals_arr + interv_len);
 
-                            std::cout << "Loaded " << chrom_vals.size() << " values for " << bw_paths[interv_idx].stem().string() << ": [";
-                            for (double val : chrom_vals) {
-                                std::cout << " " << val;
-                            }
-                            std::cout << " ]" << std::endl;
+                            // std::cout << "Loaded " << chrom_vals.size() << " values for " << bw_paths[interv_idx].stem().string()// << ": [";
+                            // for (double val : chrom_vals) {
+                            //     std::cout << " " << val;
+                            // }
+                            // std::cout << " ]" << std::endl;
 
                             std::vector<double> binned_vals = bin_vec_NaNmeans(chrom_vals, bin_size);
 
-                            std::cout << "Binned result: [";
-                            for (double val : binned_vals) {
-                                std::cout << " " << val;
-                            }
-                            std::cout << "]" << std::endl;
+                            // std::cout << "Binned result: [";
+                            // for (double val : binned_vals) {
+                            //     std::cout << " " << val;
+                            // }
+                            // std::cout << "]" << std::endl;
 
                             using namespace torch::indexing;
 
                             std::vector<double> overlapping_binned_vals = std::vector<double>(binned_vals.begin(),
                                                                                             binned_vals.begin() + (end_bin - start_bin));
-                            std::cout << "interval "<< interv_idx <<": ["<< start_bin <<", "<< end_bin <<"), "<< end_bin - start_bin << " bins." << std::endl;
+                            // std::cout << "interval "<< interv_idx <<": ["<< start_bin <<", "<< end_bin <<"), "<< end_bin - start_bin << " bins." << std::endl;
 
                             // 0-based half-open
                             chrom_binneds[chrom].index_put_({Slice(start_bin, end_bin, None), (int)bw_idx},
@@ -168,7 +167,7 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
                                                                     torch::dtype(torch::kFloat64)));
                         }
                         else {
-                            std::cout << "Interval "<< interv_idx << " is empty, skipping." << std::endl;
+                            // std::cout << "Interval "<< interv_idx << " is empty, skipping." << std::endl;
                             return;
                         }
                     });
@@ -183,16 +182,16 @@ void BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned bin_size
 
     unsigned num_intervs = spec_coords[chrom]->l;
     // cache starting indices of all intervals within tensor
-    std::cout << "Starting indices of intervals for " << chrom << ": [";
+    // std::cout << "Starting indices of intervals for " << chrom << ": [";
     std::vector<unsigned> start_bindxs(spec_coords[chrom]->l);
     start_bindxs[0] = 0;
-    std::cout << start_bindxs[0];
+    // std::cout << start_bindxs[0];
     for (int i = 1; i < num_intervs; i++) {
         // start of this interval is 1 + end of previous interval
         start_bindxs[i] = start_bindxs[i-1] + num_bins_intersect_interval(spec_coords[chrom]->start[i-1], spec_coords[chrom]->end[i-1], bin_size);
-        std::cout << ", " << start_bindxs[i];
+        // std::cout << ", " << start_bindxs[i];
     }
-    std::cout << "]" << std::endl;
+    // std::cout << "]" << std::endl;
     // total num bins just the last interval's end
     // remember, always 0-based [start, end)
     unsigned num_bins = start_bindxs.back() + num_bins_intersect_interval(spec_coords[chrom]->start[num_intervs-1], spec_coords[chrom]->end[num_intervs-1], bin_size);
