@@ -55,8 +55,17 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 # FetchContent_MakeAvailable(fmtlib)
 # # Adds fmt::fmt
 
-# libBigWig
-add_subdirectory(extern/libBigWig)
+# Try to find the library
+find_package(libbigwig QUIET)
+
+if(LIBBIGWIG_FOUND)
+  # If the library was found, link against it
+  message(STATUS "Using system libBigWig")
+else()
+  # If the library was not found, use the version included with the project
+  message(STATUS "Using bundled libBigWig")
+  add_subdirectory(extern/libBigWig)
+endif()
 
 # # TCLAP
 # add_subdirectory(extern/tclap)
