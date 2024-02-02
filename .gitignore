@@ -50,6 +50,11 @@ include/divisible/*
 build/**/*
 
 lib/*
+
+# extern project dependencies
+!extern/**/*.so
+# !extern/**/*.h
+
 bin/*
 test/test_runner
 tests/data/
