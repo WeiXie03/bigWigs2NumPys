@@ -1,4 +1,5 @@
 add_executable(bigWigs2tensors main.cc)
+target_compile_features(bigWigs2tensors PRIVATE cxx_std_20)
 
 target_include_directories(bigWigs2tensors PUBLIC ${CMAKE_SOURCE_DIR}/include)
 

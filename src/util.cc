@@ -51,7 +51,7 @@ chroms_coords_map_t parse_coords_bigBed(const std::string& coords_bed_path, cons
                         std::string chrom = chr_entry.first;
                         int chrom_size = chr_entry.second;
                         // REMEMBER to bwDestroyOverlappingIntervals() to free
-                        bbOverlappingEntries_t* interv = bbGetOverlappingEntries(coords_bed, chrom.c_str(), 0, chrom_size, 0);
+                        bbOverlappingEntries_t* interv = bbGetOverlappingEntries(coords_bed, const_cast<char*>(chrom.c_str()), 0, chrom_size, 0);
                         chroms_coords.emplace(chrom, interv);
 
                         std::cout << interv->l <<" intervals for "<< chrom <<": {";

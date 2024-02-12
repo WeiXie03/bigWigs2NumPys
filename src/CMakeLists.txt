@@ -1,6 +1,6 @@
-file(GLOB HEADER_LIST CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/libbigWigs2tensors/*.h")
+file(GLOB HEADER_LIST CONFIGURE_DEPENDS "${libbigWigs2tensors_SOURCE_DIR}/include/libbigWigs2tensors/*.h")
 
-add_library(libbigWigs2tensors SHARED
+add_library(libbigWigs2tensors STATIC
     util.cc proc_bigWigs.cc
     ${HEADER_LIST}
 )

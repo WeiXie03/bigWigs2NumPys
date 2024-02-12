@@ -14,7 +14,7 @@
 std::vector<bigWigFile_t*> open_bigWigs(const std::vector<std::string>& bw_paths) {
     std::vector<bigWigFile_t*> bw_files;
     for (const auto& path : bw_paths) {
-        bw_files.push_back(bwOpen(path.c_str(), NULL, "r"));
+        bw_files.push_back(bwOpen(const_cast<char*>(path.c_str()), NULL, "r"));
     }
     return bw_files;
 }
@@ -136,7 +136,7 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
                             unsigned end = chrom_coords->end[interv_idx];
                             // libBigWig, including chrom_coords, uses 0-based half-open intervals
                             unsigned interv_len = end - start;
-                            double* vals_arr = bwStats(bw_files[bw_idx], chrom.c_str(),
+                            double* vals_arr = bwStats(bw_files[bw_idx], const_cast<char*>(chrom.c_str()),
                                                             start, end, interv_len,
                                                             bwStatsType::doesNotExist);
                             std::vector<double> chrom_vals(vals_arr, vals_arr + interv_len);

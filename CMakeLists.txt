@@ -2,7 +2,7 @@
 # https://gitlab.com/CLIUtils/modern-cmake/-/blob/master/examples/extended-project/CMakeLists.txt
 
 # Works with 3.14 and tested through 3.27
-cmake_minimum_required(VERSION 3.14...3.27)
+cmake_minimum_required(VERSION 3.14...3.28)
 
 # Project name and a few useful settings. Other commands can pick up the results
 project(
@@ -10,6 +10,9 @@ project(
   VERSION 0.1
   DESCRIPTION "A bigWigs binner that outputs PyTorch tensors"
   LANGUAGES CXX)
+
+# CMake find modules
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 # Only do these if this is the main project, and not if it is included through add_subdirectory
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
@@ -56,9 +59,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 # # Adds fmt::fmt
 
 # Try to find the library
-find_package(libbigwig QUIET)
+# First try conda and module loaded, credit https://stackoverflow.com/a/49816516
+find_package(libBigWig PATHS)
+find_package(libBigWig QUIET)
 
-if(LIBBIGWIG_FOUND)
+if(libBigWig_FOUND)
   # If the library was found, link against it
   message(STATUS "Using system libBigWig")
 else()
