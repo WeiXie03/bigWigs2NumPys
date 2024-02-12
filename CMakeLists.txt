@@ -50,6 +50,14 @@ find_package(Torch REQUIRED)
 # Adds Torch::Torch
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
+# need TBB for parallelism (std::execution::par_unseq policy) apparently
+# credit https://stackoverflow.com/q/66881657
+find_package(TBB REQUIRED)
+if (TBB_VERSION_MAJOR VERSION_LESS "2018")
+    message(FATAL_ERROR "Require tbb 2018 or higher.")
+endif()
+message(STATUS "TBB: ${TBB_VERSION}")
+
 # # Formatting library
 # FetchContent_Declare(
 #   fmtlib
