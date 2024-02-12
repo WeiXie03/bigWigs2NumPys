@@ -37,8 +37,8 @@ std::map<std::string, int> parse_chrom_sizes(const std::string& chrom_sizes_path
 }
 
 chroms_coords_map_t parse_coords_bigBed(const std::string& coords_bed_path, const std::map<std::string, int>& chrom_sizes) {
-    bigWigFile_t* coords_bed = bbOpen(coords_bed_path.c_str(), NULL);
-    if (bbIsBigBed(coords_bed_path.c_str(), NULL) != 1) {
+    bigWigFile_t* coords_bed = bbOpen(const_cast<char*>(coords_bed_path.c_str()), NULL);
+    if (bbIsBigBed(const_cast<char*>(coords_bed_path.c_str()), NULL) != 1) {
         std::cerr << "ERROR: " << coords_bed_path << " is not a bigBed file" << std::endl;
         exit(1);
     }
@@ -68,7 +68,7 @@ chroms_coords_map_t parse_coords_bigBed(const std::string& coords_bed_path, cons
         std::string chrom = chr_entry.first;
         int chrom_size = chr_entry.second;
         // REMEMBER to bwDestroyOverlappingIntervals() to free
-        bbOverlappingEntries_t* interv = bbGetOverlappingEntries(coords_bed, chrom.c_str(), 0, chrom_size, 0);
+        bbOverlappingEntries_t* interv = bbGetOverlappingEntries(coords_bed, const_cast<char*>(chrom.c_str()), 0, chrom_size, 0);
         chroms_coords.emplace(chrom, interv);
 
         std::cout << interv->l <<" intervals for "<< chrom <<": {";
