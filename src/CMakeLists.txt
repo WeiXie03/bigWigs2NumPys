@@ -8,7 +8,9 @@ add_library(libbigWigs2tensors STATIC
 target_include_directories(libbigWigs2tensors PUBLIC ../include ../extern/libBigWig)
 
 target_link_libraries(libbigWigs2tensors
-  ${TORCH_LIBRARIES} libBigWig
+  PUBLIC ${TORCH_LIBRARIES}
+  PUBLIC libBigWig
+  PRIVATE TBB::tbb
   )
 
 target_compile_features(libbigWigs2tensors PUBLIC cxx_std_20)
