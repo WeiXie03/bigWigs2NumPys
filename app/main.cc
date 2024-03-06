@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
         TCLAP::ValueArg<std::string> chrom_sizes("s", "chrom-sizes", "chromosome sizes file", true, "", "path (string)", cmd);
         TCLAP::ValueArg<std::string> coords_bed("c", "coords-bigBed", "bigBed file of genomic coordinates within all bigWigs to bin over", false, "", "path (string)", cmd);
         TCLAP::UnlabeledValueArg<std::string> out_dir("out-dir", "directory to write binned tensors to", true, "", "path (string)", cmd);
-        TCLAP::SwitchArg verbose("v", "verbose", "print verbose output", cmd, false);
+        TCLAP::SwitchArg verbose("v" , "verbose", "print verbose output", cmd, false);
         cmd.parse(argc, argv);
 
         if (verbose.getValue()) {
@@ -58,9 +58,9 @@ int main(int argc, char** argv) {
             std::cout << "out dir: " << out_dir.getValue() << std::endl;
 
             std::cout << tracks_list.getValue().size() << " track arguments given." << std::endl;
-            std::cout << "tracks list: [";
+            std::cout << "tracks list: [\n";
             for (auto& track : tracks_list.getValue()) {
-                std::cout << '\t' << track << std::endl;
+                std::cout << '\t' << track << '\n';
             }
             std::cout << "]" << std::endl;
 
@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
             return 1;
         }
         if (verbose.getValue()) {
-            std::cout << "Found " << bw_paths.size() << " bigWig files in " << tracks_list.getValue() <<":\n";
+            std::cout << "Found " << bw_paths.size() << " bigWig files:\n";
             for (auto& path : bw_paths) {
                 std::cout << '\t' << path << std::endl;
             }
@@ -96,18 +96,21 @@ int main(int argc, char** argv) {
         chroms_coords_map_t coords_map;
         std::string chrom_sizes_path = chrom_sizes.getValue();
         std::map<std::string,int> chr_sizes_map = parse_chrom_sizes(chrom_sizes_path);
+
+        BWBinner* bwb = nullptr;
         if (coords_bed.isSet()) {
-            std::cout << "Parsing coordinates bigBed..." << std::endl;
-            coords_map = parse_coords_bigBed(coords_bed.getValue(), chr_sizes_map);
+            std::cout << "Using specified coordinates bigBed..." << std::endl;
+            bwb = new BWBinner(bw_paths, chrom_sizes_path, coords_bed.getValue());
+            // std::cout << "Parsing coordinates bigBed..." << std::endl;
+            // coords_map = parse_coords_bigBed(coords_bed.getValue(), chr_sizes_map);
         }
         else {
-            coords_map = make_full_chroms_coords_map(chr_sizes_map);
+            // coords_map = make_full_chroms_coords_map(chr_sizes_map);
+            bwb = new BWBinner(bw_paths, chrom_sizes_path);
         }
-        std::cout << "Done parsing coordinates bigBed." << std::endl;
-        BWBinner bwb(bw_paths, chrom_sizes_path, coords_map);
 
         std::cout << "Binning bigWigs..." << std::endl;
-        auto binned = bwb.load_bin_all_chroms(res.getValue());
+        auto binned = bwb->load_bin_all_chroms(res.getValue());
         std::cout << "Done binning bigWigs: " << binned.size() << " chromosomes" << std::endl;
         for (auto& [chrom, tensor] : binned) {
             std::cout << chrom << ": " << tensor.sizes() << std::endl;
@@ -115,8 +118,10 @@ int main(int argc, char** argv) {
 
         std::string save_path = out_dir.getValue();
         std::cout << "Writing tensors to "<< save_path << "..." << std::endl;
-        bwb.save_binneds(save_path);
+        bwb->save_binneds(save_path);
         std::cout << "Done writing tensors to disk." << std::endl;
+
+        delete bwb;
     }
     catch (TCLAP::ArgException& e) {
         std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;

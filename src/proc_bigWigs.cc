@@ -59,25 +59,28 @@ std::vector<double> bin_vec_NaNmeans(std::vector<double>& in_vec, size_t bin_siz
     return means;
 }
 
-BWBinner::BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path, const std::map<std::string, bbOverlappingEntries_t*>& coords_map)
+BWBinner::BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path, const std::string& coords_bed_path)
     : bw_files(open_bigWigs(bigWig_paths)),
     num_bws(bw_files.size()),
-    chrom_sizes(parse_chrom_sizes(chrom_sizes_path)),
-    tens_opts(constants::tensor_opts),
-    spec_coords(coords_map)
+    tens_opts(constants::tensor_opts)
 {
-    // std::cout << "\n=========================\n";
+    // assign the returned maps to the class members using move semantics
+    std::tie(chrom_sizes, spec_coords) = std::move(parse_chrom_sizes_coords(chrom_sizes_path, coords_bed_path));
 
-    // Parse the coordinates bed file
-    //spec_coords = parse_coords_bigBed(coords_bed_path, chrom_sizes);
-    for (const auto& [chr, interv] : spec_coords) {
-        std::cout << chr <<": "<< interv->l <<" intervals"<< std::endl;
-        std::cout << '\t';
-        for (int i = 0; i < interv->l; i++) {
-            std::cout << ' ' << interv->start[i] << '-' << interv->end[i];
-        };
-        std::cout << std::endl;
+    // std::cout << "\n=========================\n";
+    std::cout << "Chrom sizes after filtering: \n";
+    for (const auto& [chr, size] : chrom_sizes) {
+        std::cout << chr << ": " << size << std::endl;
     }
+
+    // for (const auto& [chr, interv] : spec_coords) {
+    //     std::cout << chr <<": "<< interv->l <<" intervals"<< std::endl;
+    //     std::cout << '\t';
+    //     for (int i = 0; i < interv->l; i++) {
+    //         std::cout << ' ' << interv->start[i] << '-' << interv->end[i];
+    //     };
+    //     std::cout << std::endl;
+    // }
 
     std::transform(bigWig_paths.cbegin(), bigWig_paths.cend(),
                     std::back_inserter(bw_paths),
@@ -87,8 +90,26 @@ BWBinner::BWBinner(const std::vector<std::string>& bigWig_paths, const std::stri
 }
 
 BWBinner::BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path)
-    : BWBinner(bigWig_paths, chrom_sizes_path,
-                make_full_chroms_coords_map(parse_chrom_sizes(chrom_sizes_path))) {}
+    : bw_files(open_bigWigs(bigWig_paths)),
+    num_bws(bw_files.size()),
+    tens_opts(constants::tensor_opts),
+    chrom_sizes(parse_chrom_sizes(chrom_sizes_path)),
+    spec_coords(make_full_chroms_coords_map(chrom_sizes))
+{
+    std::transform(bigWig_paths.cbegin(), bigWig_paths.cend(),
+                    std::back_inserter(bw_paths),
+                    [](const std::string& path) {
+                        return std::filesystem::path(path);
+                    });
+}
+
+BWBinner::BWBinner(BWBinner&& other)
+    : bw_files(std::move(other.bw_files)),
+    num_bws(other.num_bws),
+    tens_opts(other.tens_opts),
+    chrom_sizes(std::move(other.chrom_sizes)),
+    spec_coords(std::move(other.spec_coords)),
+    chrom_binneds(std::move(other.chrom_binneds)) {}
 
 BWBinner::~BWBinner() {
     // std::cout << "BWBinner shutting down" << std::endl;
@@ -141,7 +162,7 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
                                                             bwStatsType::doesNotExist);
                             std::vector<double> chrom_vals(vals_arr, vals_arr + interv_len);
 
-                            // std::cout << "Loaded " << chrom_vals.size() << " values for " << bw_paths[interv_idx].stem().string()// << ": [";
+                            std::cout << "Loaded " << chrom_vals.size() << " values for " << bw_paths[bw_idx].stem().string() << std::endl; // << ": [";
                             // for (double val : chrom_vals) {
                             //     std::cout << " " << val;
                             // }
@@ -149,6 +170,7 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
 
                             std::vector<double> binned_vals = bin_vec_NaNmeans(chrom_vals, bin_size);
 
+                            std::cout << binned_vals.size() << " binned values" << std::endl;
                             // std::cout << "Binned result: [";
                             // for (double val : binned_vals) {
                             //     std::cout << " " << val;
@@ -159,15 +181,15 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
 
                             std::vector<double> overlapping_binned_vals = std::vector<double>(binned_vals.begin(),
                                                                                             binned_vals.begin() + (end_bin - start_bin));
-                            // std::cout << "interval "<< interv_idx <<": ["<< start_bin <<", "<< end_bin <<"), "<< end_bin - start_bin << " bins." << std::endl;
+                            std::cout << "interval "<< interv_idx <<": ["<< start_bin <<", "<< end_bin <<"), "<< end_bin - start_bin << " overlapping bins." << std::endl;
 
                             // 0-based half-open
-                            chrom_binneds[chrom].index_put_({Slice(start_bin, end_bin, None), (int)bw_idx},
-                                                    torch::from_blob(overlapping_binned_vals.data(), {num_bins},
+                            chrom_binneds[chrom].index_put_({Slice(start_bin, end_bin), (int)bw_idx},
+                                                    torch::from_blob(overlapping_binned_vals.data(), {end_bin - start_bin},
                                                                     torch::dtype(torch::kFloat64)));
                         }
                         else {
-                            // std::cout << "Interval "<< interv_idx << " is empty, skipping." << std::endl;
+                            std::cout << "Interval "<< interv_idx << " is empty, skipping." << std::endl;
                             return;
                         }
                     });
@@ -185,13 +207,13 @@ void BWBinner::load_bin_chrom_tensor(const std::string& chrom, unsigned bin_size
     // std::cout << "Starting indices of intervals for " << chrom << ": [";
     std::vector<unsigned> start_bindxs(spec_coords[chrom]->l);
     start_bindxs[0] = 0;
-    // std::cout << start_bindxs[0];
+    std::cout << "[" << start_bindxs[0];
     for (int i = 1; i < num_intervs; i++) {
         // start of this interval is 1 + end of previous interval
         start_bindxs[i] = start_bindxs[i-1] + num_bins_intersect_interval(spec_coords[chrom]->start[i-1], spec_coords[chrom]->end[i-1], bin_size);
-        // std::cout << ", " << start_bindxs[i];
+        std::cout << ", " << start_bindxs[i];
     }
-    // std::cout << "]" << std::endl;
+    std::cout << "]" << std::endl;
     // total num bins just the last interval's end
     // remember, always 0-based [start, end)
     unsigned num_bins = start_bindxs.back() + num_bins_intersect_interval(spec_coords[chrom]->start[num_intervs-1], spec_coords[chrom]->end[num_intervs-1], bin_size);
@@ -224,7 +246,7 @@ const std::map<std::string, torch::Tensor>& BWBinner::load_bin_all_chroms(unsign
     std::for_each(std::execution::par_unseq,
         chrom_sizes.begin(), chrom_sizes.end(),
         [this, bin_size](auto& chr_entry) {
-            // std::cout << "Binning " << chr_entry.first << std::endl;
+            std::cout << "Binning " << chr_entry.first << std::endl;
             //chrom_binneds[chr_entry.first] = BWBinner::load_bin_chrom_tensor(chr_entry.first, bin_size);
             BWBinner::load_bin_chrom_tensor(chr_entry.first, bin_size);
         }

@@ -10,7 +10,7 @@ target_sources(
 target_include_directories(
     doctest
     INTERFACE
-    ${PROJECT_SOURCE_DIR}/include/doctest
+    ${PROJECT_SOURCE_DIR}/include/bigWigs2tensors
 )
 
 add_executable(
@@ -20,7 +20,7 @@ add_executable(
    ${PROJECT_SOURCE_DIR}/src/util.cc
 )
 target_include_directories(test PUBLIC ${CMAKE_SOURCE_DIR}/include ../extern/libBigWig)
-target_link_libraries(test libBigWig torch doctest libbigWigs2tensors)
+target_link_libraries(test libBigWig torch doctest bigWigs2tensors_lib)
 
 #add_executable(
 #    test_no_doctest

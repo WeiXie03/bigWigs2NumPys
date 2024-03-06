@@ -43,9 +43,10 @@ public:
     Args:
         bw_paths: a NULL-terminated array of paths to bigWig files
         chrom_sizes_path: path to a whitespace-delimited file of chromosome sizes
-        coords_bed_path: optional path to a bed file of coordinates to bin over
+        coords_bed_path: optional path to a bed file specifying coordinates to bin over
     */
-    BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path, const std::map<std::string, bbOverlappingEntries_t*>& coords_map);
+    // BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path, const std::map<std::string, bbOverlappingEntries_t*>& coords_map);
+    BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path, const std::string& coords_bed_path);
 
     /*!
     Constructs a BWBinner object that will bin the bigWig files
@@ -54,6 +55,11 @@ public:
         chrom_sizes_path: path to a whitespace-delimited file of chromosome sizes
     */
     BWBinner(const std::vector<std::string>& bigWig_paths, const std::string& chrom_sizes_path);
+
+    /*!
+    Move constructor
+    */
+    BWBinner(BWBinner&& other);
 
     ~BWBinner();
 

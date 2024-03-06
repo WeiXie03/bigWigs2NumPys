@@ -15,3 +15,6 @@ chr | start | end | expected result
 
 _Jan 18_
 _Why `bbGetOverlappingEntries()` returning no overlapping entries when test program in libBigWig test directory prints correct ones __on same bigBed file?!___
+
+^ _Feb 24_
+On 0x555557b7bf90 "chr10_GL383545v1_alt"
