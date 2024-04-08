@@ -32,7 +32,7 @@ std::vector<double> bin_vec_NaNmeans(std::vector<double>& in_vec, size_t bin_siz
     // Need to handle last bin separately if it's not full,
     // so just go up to last full bin first
     size_t n_bins = ceil(double(in_vec.size()) / double(bin_size));
-    std::vector<double> means(n_bins - 1);
+    std::vector<double> means (n_bins - 1);
     std::vector<size_t> bindx (n_bins - 1);
     std::iota(bindx.begin(), bindx.end(), 0);
 
@@ -158,17 +158,17 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
                             // libBigWig, including chrom_coords, uses 0-based half-open intervals
                             unsigned interv_len = end - start;
                             double* vals_arr = bwStats(bw_files[bw_idx], const_cast<char*>(chrom.c_str()),
-                                                            start, end, interv_len,
-                                                            bwStatsType::doesNotExist);
-                            std::vector<double> chrom_vals(vals_arr, vals_arr + interv_len);
+                                                            start, end, num_bins,
+                                                            bwStatsType::mean);
+                            std::vector<double> binned_vals(vals_arr, vals_arr + interv_len);
 
-                            std::cout << "Loaded " << chrom_vals.size() << " values for " << bw_paths[bw_idx].stem().string() << std::endl; // << ": [";
+                            std::cout << "Loaded " << binned_vals.size() << " bins for " << bw_paths[bw_idx].stem().string() << std::endl; // << ": [";
                             // for (double val : chrom_vals) {
                             //     std::cout << " " << val;
                             // }
                             // std::cout << " ]" << std::endl;
 
-                            std::vector<double> binned_vals = bin_vec_NaNmeans(chrom_vals, bin_size);
+                            // std::vector<double> binned_vals = bin_vec_NaNmeans(chrom_vals, bin_size);
 
                             std::cout << binned_vals.size() << " binned values" << std::endl;
                             // std::cout << "Binned result: [";
@@ -179,13 +179,14 @@ void BWBinner::load_bin_chrom_bigWig_tensor(const std::string& chrom, size_t bw_
 
                             using namespace torch::indexing;
 
-                            std::vector<double> overlapping_binned_vals = std::vector<double>(binned_vals.begin(),
-                                                                                            binned_vals.begin() + (end_bin - start_bin));
+                            // std::vector<double> overlapping_binned_vals = std::vector<double>(binned_vals.begin(),
+                            //                                                                 binned_vals.begin() + (end_bin - start_bin));
                             std::cout << "interval "<< interv_idx <<": ["<< start_bin <<", "<< end_bin <<"), "<< end_bin - start_bin << " overlapping bins." << std::endl;
 
                             // 0-based half-open
                             chrom_binneds[chrom].index_put_({Slice(start_bin, end_bin), (int)bw_idx},
-                                                    torch::from_blob(overlapping_binned_vals.data(), {end_bin - start_bin},
+                                                    torch::from_blob(binned_vals.data(), {end_bin - start_bin},
+                                                    // torch::from_blob(overlapping_binned_vals.data(), {end_bin - start_bin},
                                                                     torch::dtype(torch::kFloat64)));
                         }
                         else {
